@@ -1,0 +1,99 @@
+{
+  "entities": {
+    "Signal": {
+      "title": "Trading Signal",
+      "description": "VIP market trade recommendation posted by Soni/mentors",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 100 },
+        "symbol": { "type": "string", "maxLength": 30 },
+        "segment": { "type": "string", "enum": ["options", "equity", "futures", "crypto", "commodity"] },
+        "type": { "type": "string", "enum": ["BUY", "SELL"] },
+        "entryMin": { "type": "number" },
+        "entryMax": { "type": "number" },
+        "target1": { "type": "number" },
+        "target2": { "type": "number" },
+        "target3": { "type": "number" },
+        "stopLoss": { "type": "number" },
+        "currentPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["ACTIVE", "TARGET_1_HIT", "TARGET_2_HIT", "TARGET_3_HIT", "SL_HIT", "CLOSED"] },
+        "notes": { "type": "string", "maxLength": 500 },
+        "authorId": { "type": "string", "maxLength": 128 },
+        "authorName": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["symbol", "segment", "type", "entryMin", "target1", "stopLoss", "status", "authorId"]
+    },
+    "JournalTrade": {
+      "title": "Journal Trade",
+      "description": "User personal trading journal record",
+      "type": "object",
+      "properties": {
+        "symbol": { "type": "string", "maxLength": 30 },
+        "tradeType": { "type": "string", "enum": ["BUY", "SELL"] },
+        "segment": { "type": "string", "enum": ["options", "equity", "futures", "crypto"] },
+        "entryPrice": { "type": "number" },
+        "exitPrice": { "type": "number" },
+        "quantity": { "type": "number" },
+        "pnl": { "type": "number" },
+        "status": { "type": "string", "enum": ["OPEN", "CLOSED"] },
+        "strategy": { "type": "string", "maxLength": 100 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "tradeDate": { "type": "string", "maxLength": 50 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["symbol", "tradeType", "entryPrice", "quantity", "status", "userId"]
+    },
+    "CommunityMessage": {
+      "title": "Community Message",
+      "description": "Real-time trading community post or query",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "userName": { "type": "string", "maxLength": 100 },
+        "userAvatar": { "type": "string", "maxLength": 300 },
+        "message": { "type": "string", "maxLength": 500 },
+        "isMentor": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "userName", "message"]
+    },
+    "MarketLevel": {
+      "title": "Daily Key Market Levels",
+      "description": "Support and resistance levels for key indices and stocks",
+      "type": "object",
+      "properties": {
+        "symbol": { "type": "string", "maxLength": 30 },
+        "support1": { "type": "number" },
+        "support2": { "type": "number" },
+        "resistance1": { "type": "number" },
+        "resistance2": { "type": "number" },
+        "view": { "type": "string", "maxLength": 300 },
+        "authorId": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["symbol", "support1", "resistance1", "authorId"]
+    }
+  },
+  "firestore": {
+    "/signals/{signalId}": {
+      "schema": { "$ref": "#/entities/Signal" },
+      "description": "Trading calls and signals published for the community"
+    },
+    "/users/{userId}/trades/{tradeId}": {
+      "schema": { "$ref": "#/entities/JournalTrade" },
+      "description": "Private trade journal entries belonging to a specific user"
+    },
+    "/community_messages/{messageId}": {
+      "schema": { "$ref": "#/entities/CommunityMessage" },
+      "description": "Community chat messages and mentorship questions"
+    },
+    "/market_levels/{levelId}": {
+      "schema": { "$ref": "#/entities/MarketLevel" },
+      "description": "Daily key levels and market analysis published by mentor"
+    }
+  }
+}

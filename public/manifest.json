@@ -1,0 +1,17 @@
+{
+  "short_name": "TradeWithSoni",
+  "name": "Trade with Soni - Pro Trading Platform",
+  "icons": [
+    {
+      "src": "/src/assets/images/trade_with_soni_icon_1793208658167.jpg",
+      "type": "image/jpeg",
+      "sizes": "1024x1024",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "display": "standalone",
+  "orientation": "portrait"
+}

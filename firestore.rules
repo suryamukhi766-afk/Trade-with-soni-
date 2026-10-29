@@ -1,0 +1,158 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitives and Global Helpers
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email != null && request.auth.token.email == 'suryamukhi766@gmail.com')
+      );
+    }
+
+    // Signals Validation Helper
+    function isValidSignal(data) {
+      return data.symbol is string && data.symbol.size() <= 30 &&
+             data.segment in ['options', 'equity', 'futures', 'crypto', 'commodity'] &&
+             data.type in ['BUY', 'SELL'] &&
+             data.entryMin is number && data.entryMin >= 0 &&
+             data.target1 is number && data.target1 >= 0 &&
+             data.stopLoss is number && data.stopLoss >= 0 &&
+             data.status in ['ACTIVE', 'TARGET_1_HIT', 'TARGET_2_HIT', 'TARGET_3_HIT', 'SL_HIT', 'CLOSED'] &&
+             data.authorId is string && data.authorId.size() <= 128 &&
+             (!('title' in data) || (data.title is string && data.title.size() <= 100)) &&
+             (!('entryMax' in data) || data.entryMax is number) &&
+             (!('target2' in data) || data.target2 is number) &&
+             (!('target3' in data) || data.target3 is number) &&
+             (!('currentPrice' in data) || data.currentPrice is number) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 500)) &&
+             (!('authorName' in data) || (data.authorName is string && data.authorName.size() <= 100)) &&
+             (!('createdAt' in data) || data.createdAt is string) &&
+             (!('updatedAt' in data) || data.updatedAt is string);
+    }
+
+    // Journal Trade Validation Helper
+    function isValidJournalTrade(data, ownerId) {
+      return data.userId == ownerId &&
+             data.symbol is string && data.symbol.size() <= 30 &&
+             data.tradeType in ['BUY', 'SELL'] &&
+             data.entryPrice is number && data.entryPrice >= 0 &&
+             data.quantity is number && data.quantity > 0 &&
+             data.status in ['OPEN', 'CLOSED'] &&
+             (!('segment' in data) || data.segment in ['options', 'equity', 'futures', 'crypto']) &&
+             (!('exitPrice' in data) || data.exitPrice is number) &&
+             (!('pnl' in data) || data.pnl is number) &&
+             (!('strategy' in data) || (data.strategy is string && data.strategy.size() <= 100)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
+             (!('tradeDate' in data) || (data.tradeDate is string && data.tradeDate.size() <= 50)) &&
+             (!('createdAt' in data) || data.createdAt is string) &&
+             (!('updatedAt' in data) || data.updatedAt is string);
+    }
+
+    // Community Message Validation Helper
+    function isValidCommunityMessage(data) {
+      return data.userId == request.auth.uid &&
+             data.userName is string && data.userName.size() <= 100 &&
+             data.message is string && data.message.size() <= 500 &&
+             (!('userAvatar' in data) || (data.userAvatar is string && data.userAvatar.size() <= 300)) &&
+             (!('isMentor' in data) || (data.isMentor is bool && (!data.isMentor || isAdmin()))) &&
+             (!('createdAt' in data) || data.createdAt is string);
+    }
+
+    // Market Level Validation Helper
+    function isValidMarketLevel(data) {
+      return data.symbol is string && data.symbol.size() <= 30 &&
+             data.support1 is number &&
+             data.resistance1 is number &&
+             data.authorId is string && data.authorId.size() <= 128 &&
+             (!('support2' in data) || data.support2 is number) &&
+             (!('resistance2' in data) || data.resistance2 is number) &&
+             (!('view' in data) || (data.view is string && data.view.size() <= 300)) &&
+             (!('updatedAt' in data) || data.updatedAt is string);
+    }
+
+    // 1. Trading Signals Collection
+    match /signals/{signalId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(signalId) &&
+                       isValidSignal(incoming()) &&
+                       (incoming().authorId == request.auth.uid || isAdmin());
+      allow update: if isSignedIn() && isValidId(signalId) &&
+                       isValidSignal(incoming()) &&
+                       (existing().authorId == request.auth.uid || isAdmin()) &&
+                       incoming().authorId == existing().authorId;
+      allow delete: if isSignedIn() && isValidId(signalId) &&
+                       (existing().authorId == request.auth.uid || isAdmin());
+    }
+
+    // 2. User Private Trades Journal (Subcollection Pattern)
+    match /users/{userId}/trades/{tradeId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidId(tradeId) &&
+                       isValidJournalTrade(incoming(), userId);
+      allow update: if isOwner(userId) && isValidId(tradeId) &&
+                       isValidJournalTrade(incoming(), userId) &&
+                       incoming().userId == existing().userId;
+      allow delete: if isOwner(userId) && isValidId(tradeId);
+    }
+
+    // 3. Community Messages Collection
+    match /community_messages/{messageId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(messageId) &&
+                       isValidCommunityMessage(incoming());
+      allow update: if isSignedIn() && isValidId(messageId) &&
+                       existing().userId == request.auth.uid &&
+                       isValidCommunityMessage(incoming()) &&
+                       incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && isValidId(messageId) &&
+                       (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    // 4. Market Key Levels Collection
+    match /market_levels/{levelId} {
+      allow read: if isSignedIn();
+      allow create: if (isAdmin() || (isSignedIn() && incoming().authorId == request.auth.uid)) &&
+                       isValidId(levelId) && isValidMarketLevel(incoming());
+      allow update: if (isAdmin() || (isSignedIn() && existing().authorId == request.auth.uid)) &&
+                       isValidId(levelId) && isValidMarketLevel(incoming());
+      allow delete: if isAdmin() || (isSignedIn() && existing().authorId == request.auth.uid);
+    }
+
+    // 5. Admins list
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // 6. Connection test document
+    match /test/{docId} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}
